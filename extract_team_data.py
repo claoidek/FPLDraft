@@ -10,7 +10,7 @@ def extract_data(data):
     players, points = [], []
     score_regex = re.search("Latest Points</h4><div class=3D\"EntryEvent__PrimaryValue-ernz96-3 gcscIr\">(\d+)", data)
     score = (score_regex.group(1))
-    players_regex = re.findall("([\w=\d\s]+)</div><div class=3D\"PitchElement__ElementValue-rzo355-3 fKolYJ\">(\d+)",data)
+    players_regex = re.findall("([\w=\d\s\.-]+)</div><div class=3D\"PitchElement__ElementValue-rzo355-3 fKolYJ\">(\d+)",data)
     for match in players_regex:
         if "=" in match[0]:
             unicode_regex = re.findall("=([\d\w]{2})=([\d\w]{2})",match[0])
