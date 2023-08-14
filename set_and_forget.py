@@ -133,7 +133,7 @@ def get_formation(team):
     return formation
 
 if __name__ == "__main__":
-    gameweek = sys.argv[1]
+    gameweek = int(sys.argv[1])
     managers = ["Brian","Caoimhín","Niamh","Seán","Violet"]
     draft_teams = construct_draft_teams(managers)
     player_data = read_player_csv("drafted_players_2324.csv")
