@@ -2,20 +2,22 @@ import re
 
 def read_file(filename):
     with open(filename, 'r') as fp:
-        important_lines = fp.readlines()[500:800] # This range should containt all the data we need
+        important_lines = fp.readlines()[500:1100] # This range should containt all the data we need
         no_equals = [sub[: -2] for sub in important_lines] # Removes the last character of every line to get rid of inconvenient equals signs
         return(''.join(no_equals))
 
 def extract_data(data):
     players, points = [], []
-    score_regex = re.search("Latest Points</h4><div class=3D\"EntryEvent__PrimaryValue-ernz96-3 gcscIr\">(\d+)", data)
+    score_regex = re.search(" Points</h4><div class=3D\"EntryEvent__PrimaryValue-ernz96-3 gcscIr\">(-?\d+)", data)
     score = (score_regex.group(1))
-    players_regex = re.findall("([\w=\d\s\.-]+)</div><div class=3D\"PitchElement__ElementValue-rzo355-3 fKolYJ\">(\d+)",data)
+    players_regex = re.findall("([\w=\d\s\.-]+)</div><div class=3D\"PitchElement__ElementValue-rzo355-3 fKolYJ\">(-?\d+)",data)
     for match in players_regex:
-        if "=" in match[0]:
+        if "=" in match[0]: # Handles players with special characters in their names
             unicode_regex = re.findall("=([\d\w]{2})=([\d\w]{2})",match[0])
+            player_name = match[0]
             for unicode_match in unicode_regex:
-                players.append(re.sub("=" + unicode_match[0] + "=" + unicode_match[1],bytes.fromhex(unicode_match[0] + unicode_match[1]).decode(),match[0]))
+                player_name = re.sub("=" + unicode_match[0] + "=" + unicode_match[1],bytes.fromhex(unicode_match[0] + unicode_match[1]).decode(),player_name)
+            players.append(player_name)
         else:
             players.append(match[0])
         points.append(match[1])
