@@ -2,32 +2,35 @@ import re
 
 def read_file(filename):
     with open(filename, 'r') as fp:
-        important_lines = fp.readlines()[500:1100] # This range should containt all the data we need
+        important_lines = fp.readlines()
         no_equals = [sub[: -2] for sub in important_lines] # Removes the last character of every line to get rid of inconvenient equals signs
         return(''.join(no_equals))
 
 def extract_data(data):
     players, points = [], []
-    score_regex = re.search(" Points</h4><div class=3D\"EntryEvent__PrimaryValue-ernz96-3 gcscIr\">(-?\d+)", data)
+    score_regex = re.search(" Points</h4><div class=\"EntryEvent__PrimaryValue-ernz96-4 bGEHdY\">(-?\\d+)", data)
     score = (score_regex.group(1))
-    players_regex = re.findall("([\w=\d\s\.-]+)</div><div class=3D\"PitchElement__ElementValue-rzo355-3 fKolYJ\">(-?\d+)",data)
+    players_regex = re.findall("([\\w=\\d\\s\\.-]+)</div><div class=\"styles__ElementValue-sc-52mmxp-6 cHYlGH\">(-?\\d*)<",data)
     for match in players_regex:
         if "=" in match[0]: # Handles players with special characters in their names
-            unicode_regex = re.findall("=([\d\w]{2})=([\d\w]{2})",match[0])
+            unicode_regex = re.findall("=([\\d\\w]{2})=([\\d\\w]{2})",match[0])
             player_name = match[0]
             for unicode_match in unicode_regex:
                 player_name = re.sub("=" + unicode_match[0] + "=" + unicode_match[1],bytes.fromhex(unicode_match[0] + unicode_match[1]).decode(),player_name)
             players.append(player_name)
         else:
             players.append(match[0])
-        points.append(match[1])
+        if not match[1]:
+            points.append(0)
+        else:
+            points.append(match[1])
     return players, points, score
 
 if __name__ == "__main__":
     managers = ["Brian","Caoimhín","Niamh","Seán","Violet"]
     scores = []
     for manager in managers:
-        filename = manager + ".mht"
+        filename = manager + ".mhtml"
         data = read_file(filename)
         print("\n" + manager)
         players, points, score = extract_data(data)
