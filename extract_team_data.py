@@ -8,9 +8,7 @@ managers = ["Brian","Caoimhín","Niamh","Seán","Violet"]
 
 def read_file(filename):
     with open(filename, 'r') as fp:
-        important_lines = fp.readlines()
-        no_equals = [sub[: -2] for sub in important_lines] # Removes the last character of every line to get rid of inconvenient equals signs
-        return(''.join(no_equals))
+        return(''.join(fp.readlines()))
 
 def extract_data(data):
     players, points = [], []
