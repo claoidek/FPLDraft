@@ -13,6 +13,12 @@ for manager in "${!managers[@]}"; do
     echo -e "\tDownloading $manager's mhtml"
     ./single-file $url "$manager.mhtml"
     echo -e "\tDone"
+    echo -e "\tReducing size of $manager.mhtml"
+    grep cHYlGH "$manager.mhtml" > temp.mhtml
+    sed 's/^.*\(Final Points<.*\)/\1/' temp.mhtml > "$manager.mhtml"
+    sed 's/^\(.*cHYlGH">[-[:digit:]]*<.\).*/\1/' "$manager.mhtml" > temp.mhtml
+    mv temp.mhtml "$manager.mhtml"
+    echo -e "\tDone"
 done
 echo "Done"
 
