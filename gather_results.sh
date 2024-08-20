@@ -10,7 +10,7 @@ echo "Downloading mhtml files for game week $gameweek"
 for manager in "${!managers[@]}"; do
     rm -f "$manager.mhtml"
     url="https://draft.premierleague.com/entry/${managers[$manager]}/event/$gameweek"
-    echo -e "\tDownloading $manager's mhtml"
+    echo -e "\tDownloading $manager.mhtml"
     ./single-file $url "$manager.mhtml"
     echo -e "\tDone"
     echo -e "\tReducing size of $manager.mhtml"

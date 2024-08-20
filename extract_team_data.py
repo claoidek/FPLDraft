@@ -68,7 +68,7 @@ if __name__ == "__main__":
     print("\tDone")
     for manager in managers:
         filename = manager + ".mhtml"
-        print("\tParsing " + manager + "'s mhtml file")
+        print("\tParsing " + manager + ".mhtml")
         data = read_file(filename)
         players, points, score = extract_data(data)
         print("\tDone")
