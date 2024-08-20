@@ -2,6 +2,11 @@ import requests, json
 import pandas as pd
 import csv
 import sys
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from openpyxl.utils import get_column_letter
+
+managers = ["Brian","Caoimhín","Niamh","Seán","Violet"]
 
 def construct_draft_teams(managers):
     draft_teams = {}
@@ -117,7 +122,7 @@ def get_score(team):
         if sub_not_made:
             break
 
-    return score
+    return int(score)
     
 
 def get_initial_score(team):
@@ -132,14 +137,42 @@ def get_formation(team):
     formation = [len(team["def"]),len(team["mid"]),len(team["fwd"])]
     return formation
 
+def write_scores_to_spreadsheet(client,gameweek,scores):
+    sheet = client.open('FPL Draft Stats 2024_25').worksheet("SetAndForgetScores")
+    row = 3
+    column = gameweek+1
+    cell_string=get_column_letter(column)+str(row)+":"+get_column_letter(column)+str(row+4)
+    sheet.update(values=list(map(list, zip(*[scores]))),range_name=cell_string)
+
+def authorise_credentials():
+    scope = [
+        'https://www.googleapis.com/auth/drive',
+        'https://www.googleapis.com/auth/drive.file'
+        ]
+    file_name = 'client_key.json'
+    creds = ServiceAccountCredentials.from_json_keyfile_name(file_name,scope)
+    client = gspread.authorize(creds)
+    return client
+
 if __name__ == "__main__":
     gameweek = int(sys.argv[1])
-    managers = ["Brian","Caoimhín","Niamh","Seán","Violet"]
+    scores = []
+    print("\tAuthorising credentials")
+    client = authorise_credentials()
+    print("\tDone")
     draft_teams = construct_draft_teams(managers)
-    player_data = read_player_csv("drafted_players_2324.csv")
+    print("\tReading Set-And-Forget teams from file")
+    player_data = read_player_csv("drafted_players_2425.csv")
+    print("\tDone")
+    print("\tAdding players to data structure")
     for player in player_data:
         add_player(draft_teams,player[0],player[1],player[2],int(player[3]),int(player[4]))
-    print("Gameweek: ",gameweek)
+    print("\tDone")
+    print("\tGetting players' data for game week " + str(gameweek))
     add_gameweek_data(draft_teams,gameweek,managers)
+    print("\tDone")
     for manager in managers:
-        print(get_score(draft_teams[manager]))
+        scores.append(get_score(draft_teams[manager]))
+    print("\tWriting scores to spreadsheet")
+    write_scores_to_spreadsheet(client,gameweek,scores)
+    print("\tDone")
