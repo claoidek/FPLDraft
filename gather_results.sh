@@ -22,10 +22,7 @@ for manager in "${!managers[@]}"; do
 done
 echo "Done"
 
-echo "Getting standard scores and squads"
-python3 extract_team_data.py $gameweek
-echo "Done"
-echo "Getting Set-And-Forget scores"
-python3 set_and_forget.py $gameweek
+echo "Processing scores and squads"
+python3 process_FPL_data.py $gameweek
 echo "Done"
 echo "Success!"

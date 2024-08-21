@@ -1,14 +1,18 @@
 import requests, json
 import pandas as pd
 import csv
+import re
 import sys
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from openpyxl.utils import get_column_letter
 
 managers = ["Brian","Caoimhín","Niamh","Seán","Violet"]
+draft_file="drafted_players_2425.csv"
+client_file="client_key.json"
+spreadsheet="FPL Draft Stats 2024_25"
 
-def construct_draft_teams(managers):
+def construct_draft_teams():
     draft_teams = {}
     for manager in managers:
         add_draft_team(draft_teams,manager)
@@ -70,7 +74,7 @@ def get_gameweek_history(player_id):
     player_df = pd.json_normalize(r['history'])
     return player_df
 
-def add_gameweek_data(draft_teams,gameweek,managers):
+def add_gameweek_data(draft_teams,gameweek):
     for manager in managers:
         for position in ["start_gkp","sub_gkp","def","mid","fwd","subs"]:
             for player in draft_teams[manager][position]:
@@ -137,42 +141,105 @@ def get_formation(team):
     formation = [len(team["def"]),len(team["mid"]),len(team["fwd"])]
     return formation
 
-def write_scores_to_spreadsheet(client,gameweek,scores):
-    sheet = client.open('FPL Draft Stats 2024_25').worksheet("SetAndForgetScores")
+
+def read_file(filename):
+    with open(filename, 'r') as fp:
+        return(''.join(fp.readlines()))
+
+def extract_data(data):
+    players, points = [], []
+    score_regex = re.search(" Points</h4><div class=\"EntryEvent__PrimaryValue-ernz96-4 bGEHdY\">(-?\\d+)", data)
+    score = int((score_regex.group(1)))
+    players_regex = re.findall("([\\w=\\d\\s\\.-]+)</div><div class=\"styles__ElementValue-sc-52mmxp-6 cHYlGH\">(-?\\d*)<",data)
+    for match in players_regex:
+        if "=" in match[0]: # Handles players with special characters in their names
+            unicode_regex = re.findall("=([\\d\\w]{2})=([\\d\\w]{2})",match[0])
+            player_name = match[0]
+            for unicode_match in unicode_regex:
+                player_name = re.sub("=" + unicode_match[0] + "=" + unicode_match[1],bytes.fromhex(unicode_match[0] + unicode_match[1]).decode(),player_name)
+            players.append(player_name)
+        else:
+            players.append(match[0])
+        if not match[1]:
+            points.append(0)
+        else:
+            points.append(int(match[1]))
+    return players, points, score
+
+def write_squad_to_spreadsheet(client,gameweek,manager,players,points):
+    sheet = client.open(spreadsheet).worksheet("Squads")
+    manager_index = managers.index(manager)
+    row = 2+manager_index*17
+    column = 2+(gameweek-1)*2
+    cell_string=get_column_letter(column)+str(row)+":"+get_column_letter(column)+str(row+14)
+    sheet.update(values=list(map(list, zip(*[players]))),range_name=cell_string)
+    cell_string=get_column_letter(column+1)+str(row)+":"+get_column_letter(column+1)+str(row+14)
+    sheet.update(values=list(map(list, zip(*[points]))),range_name=cell_string)
+    return
+
+def write_scores_to_spreadsheet(client,gameweek,scores,sheetname):
+    sheet = client.open(spreadsheet).worksheet(sheetname)
     row = 3
     column = gameweek+1
     cell_string=get_column_letter(column)+str(row)+":"+get_column_letter(column)+str(row+4)
     sheet.update(values=list(map(list, zip(*[scores]))),range_name=cell_string)
+    return
 
 def authorise_credentials():
     scope = [
         'https://www.googleapis.com/auth/drive',
         'https://www.googleapis.com/auth/drive.file'
         ]
-    file_name = 'client_key.json'
-    creds = ServiceAccountCredentials.from_json_keyfile_name(file_name,scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_name(client_file,scope)
     client = gspread.authorize(creds)
     return client
 
+def process_standard(gameweek,client):
+    standard_scores = []
+    for manager in managers:
+        filename = manager + ".mhtml"
+        print("\t\tParsing " + manager + ".mhtml")
+        data = read_file(filename)
+        players, points, score = extract_data(data)
+        print("\t\tDone")
+        standard_scores.append(score)
+        print("\t\tWriting " + manager + "'s squad to spreadsheet")
+        write_squad_to_spreadsheet(client,gameweek,manager,players,points)
+        print("\t\tDone")
+    print("\t\tWriting standard scores to spreadsheet")
+    write_scores_to_spreadsheet(client,gameweek,standard_scores,"Scores")
+    print("\t\tDone")
+    return
+
+def process_saf(gameweek,client):
+    saf_scores = []
+    draft_teams = construct_draft_teams()
+    print("\t\tReading Set-And-Forget teams from file")
+    player_data = read_player_csv(draft_file)
+    print("\t\tDone")
+    print("\t\tAdding players to data structure")
+    for player in player_data:
+        add_player(draft_teams,player[0],player[1],player[2],int(player[3]),int(player[4]))
+    print("\t\tDone")
+    print("\t\tGetting players' data for game week " + str(gameweek))
+    add_gameweek_data(draft_teams,gameweek)
+    print("\t\tDone")
+    for manager in managers:
+        saf_scores.append(get_score(draft_teams[manager]))
+    print("\t\tWriting scores to spreadsheet")
+    write_scores_to_spreadsheet(client,gameweek,saf_scores,"SetAndForgetScores")
+    print("\t\tDone")
+    return
+
 if __name__ == "__main__":
     gameweek = int(sys.argv[1])
-    scores = []
+
     print("\tAuthorising credentials")
     client = authorise_credentials()
     print("\tDone")
-    draft_teams = construct_draft_teams(managers)
-    print("\tReading Set-And-Forget teams from file")
-    player_data = read_player_csv("drafted_players_2425.csv")
+    print("\tProcessing standard scores and squads")
+    process_standard(gameweek,client)
     print("\tDone")
-    print("\tAdding players to data structure")
-    for player in player_data:
-        add_player(draft_teams,player[0],player[1],player[2],int(player[3]),int(player[4]))
-    print("\tDone")
-    print("\tGetting players' data for game week " + str(gameweek))
-    add_gameweek_data(draft_teams,gameweek,managers)
-    print("\tDone")
-    for manager in managers:
-        scores.append(get_score(draft_teams[manager]))
-    print("\tWriting scores to spreadsheet")
-    write_scores_to_spreadsheet(client,gameweek,scores)
+    print("\tProcessing Set-And-Forget scores")
+    process_saf(gameweek,client)
     print("\tDone")
