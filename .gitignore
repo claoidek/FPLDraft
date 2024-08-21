@@ -128,4 +128,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-credentials.json
+client_key.json
+single_file
