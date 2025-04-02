@@ -150,7 +150,7 @@ def extract_data(data):
     players, points = [], []
     score_regex = re.search(" Points</h4><div class=\"EntryEvent__PrimaryValue-ernz96-4 bGEHdY\">(-?\\d+)", data)
     score = int((score_regex.group(1)))
-    players_regex = re.findall("([\\w=\\d\\s\\.-]+)</div><div class=\"styles__ElementValue-sc-52mmxp-6 cHYlGH\">(-?\\d*)<",data)
+    players_regex = re.findall("([\\w=\\d\\s\\.'-]+)</div><div class=\"styles__ElementValue-sc-52mmxp-6 cHYlGH\">(-?\\d*)<",data)
     for match in players_regex:
         if "=" in match[0]: # Handles players with special characters in their names
             unicode_regex = re.findall("=([\\d\\w]{2})=([\\d\\w]{2})",match[0])
@@ -179,10 +179,10 @@ def write_squad_to_spreadsheet(client,gameweek,manager,players,points):
 
 def write_scores_to_spreadsheet(client,gameweek,scores,sheetname):
     sheet = client.open(spreadsheet).worksheet(sheetname)
-    row = 3
-    column = gameweek+1
-    cell_string=get_column_letter(column)+str(row)+":"+get_column_letter(column)+str(row+4)
-    sheet.update(values=list(map(list, zip(*[scores]))),range_name=cell_string)
+    row = gameweek+1
+    column = 3
+    cell_string=get_column_letter(column)+str(row)+":"+get_column_letter(column+len(managers)-1)+str(row)
+    sheet.update(values=[scores],range_name=cell_string)
     return
 
 def authorise_credentials():
@@ -227,7 +227,7 @@ def process_saf(gameweek,client):
     for manager in managers:
         saf_scores.append(get_score(draft_teams[manager]))
     print("\t\tWriting scores to spreadsheet")
-    write_scores_to_spreadsheet(client,gameweek,saf_scores,"SetAndForgetScores")
+    write_scores_to_spreadsheet(client,gameweek,saf_scores,"SAFScores")
     print("\t\tDone")
     return
 
