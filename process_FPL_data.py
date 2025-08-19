@@ -8,9 +8,9 @@ from oauth2client.service_account import ServiceAccountCredentials
 from openpyxl.utils import get_column_letter
 
 managers = ["Brian","Caoimhín","Niamh","Seán","Violet"]
-draft_file="drafted_players_2425.csv"
+draft_file="drafted_players_2526.csv"
 client_file="client_key.json"
-spreadsheet="FPL Draft Stats 2024_25"
+spreadsheet="FPL Draft Stats 2025_26"
 
 def construct_draft_teams():
     draft_teams = {}

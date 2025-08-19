@@ -4,7 +4,7 @@
 
 gameweek=$1
 
-declare -A managers=( ["Caoimhín"]="423" ["Niamh"]="821" ["Violet"]="2254" ["Seán"]="267818" ["Brian"]="277625")
+declare -A managers=( ["Caoimhín"]="326135" ["Niamh"]="358629" ["Seán"]="360894" ["Violet"]="384238" ["Brian"]="405535")
 
 echo "Downloading mhtml files for game week $gameweek"
 for manager in "${!managers[@]}"; do
