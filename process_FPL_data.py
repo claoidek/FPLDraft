@@ -1,16 +1,17 @@
 import requests, json
 import pandas as pd
 import csv
-import re
 import sys
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from openpyxl.utils import get_column_letter
 
-managers = ["Brian","Caoimhín","Niamh","Seán","Violet"]
-draft_file="drafted_players_2526.csv"
+managers = ["Brian","Caoimhín","Niamh","Seán"]
+manager_ids = {'Brian':'209940','Caoimhín':'2921','Niamh':'3006','Seán':'214689'}
+league_id = '1140'
+draft_file="drafted_players_2627.csv"
 client_file="client_key.json"
-spreadsheet="FPL Draft Stats 2025_26"
+spreadsheet="FPL Draft Stats 2026_27"
 
 def construct_draft_teams():
     draft_teams = {}
@@ -46,8 +47,7 @@ def read_player_csv(filename):
     return player_data
 
 def get_player_data():
-    base_url = 'https://fantasy.premierleague.com/api/' 
-    r = requests.get(base_url+'bootstrap-static/').json() 
+    r = requests.get('https://fantasy.premierleague.com/api/bootstrap-static/').json() 
     players = pd.json_normalize(r['elements'])
     teams = pd.json_normalize(r['teams'])
     positions = pd.json_normalize(r['element_types'])
@@ -65,12 +65,11 @@ def get_player_data():
     df = df.rename(
         columns={'name':'team_name', 'singular_name':'position_name'}
     )
-    #print(df[['first_name', 'second_name', 'team_name', 'position_name','id_x']].loc[df['web_name'] == 'Dalot'])
+    #print(df[['first_name', 'second_name', 'team_name', 'position_name','id_x']].loc[df['web_name'] == 'Haaland'])
     return df
    
 def get_gameweek_history(player_id):
-    base_url = 'https://fantasy.premierleague.com/api/' 
-    r = requests.get(base_url + 'element-summary/' + str(player_id) + '/').json()
+    r = requests.get('https://fantasy.premierleague.com/api/element-summary/' + str(player_id) + '/').json()
     player_df = pd.json_normalize(r['history'])
     return player_df
 
@@ -141,29 +140,15 @@ def get_formation(team):
     formation = [len(team["def"]),len(team["mid"]),len(team["fwd"])]
     return formation
 
-
-def read_file(filename):
-    with open(filename, 'r') as fp:
-        return(''.join(fp.readlines()))
-
-def extract_data(data):
+def get_standard_data(manager_id, player_data):
     players, points = [], []
-    score_regex = re.search(" Points</h4><div class=\"EntryEvent__PrimaryValue-ernz96-4 bGEHdY\">(-?\\d+)", data)
-    score = int((score_regex.group(1)))
-    players_regex = re.findall("([\\w=\\d\\s\\.'’-]+)</div><div class=\"styles__ElementValue-sc-52mmxp-6 cHYlGH\">(-?\\d*)<",data)
-    for match in players_regex:
-        if "=" in match[0]: # Handles players with special characters in their names
-            unicode_regex = re.findall("=([\\d\\w]{2})=([\\d\\w]{2})",match[0])
-            player_name = match[0]
-            for unicode_match in unicode_regex:
-                player_name = re.sub("=" + unicode_match[0] + "=" + unicode_match[1],bytes.fromhex(unicode_match[0] + unicode_match[1]).decode(),player_name)
-            players.append(player_name)
-        else:
-            players.append(match[0])
-        if not match[1]:
-            points.append(0)
-        else:
-            points.append(int(match[1]))
+    r = requests.get('https://draft.premierleague.com/api/entry/'+manager_id+'/event/'+str(gameweek)).json()
+    team = r["picks"].copy()
+    for player in team:
+        player_gameweek_history = get_gameweek_history(str(player["element"]))
+        players.append(player_data[['web_name']].loc[player_data['id_x'] == player["element"]].values[0][0])
+        points.append(player_gameweek_history[['total_points']].loc[player_gameweek_history['round'] == gameweek].values[0][0].item())
+    score = sum(points[:11])
     return players, points, score
 
 def write_squad_to_spreadsheet(client,gameweek,manager,players,points):
@@ -180,7 +165,10 @@ def write_squad_to_spreadsheet(client,gameweek,manager,players,points):
 def write_scores_to_spreadsheet(client,gameweek,scores,sheetname):
     sheet = client.open(spreadsheet).worksheet(sheetname)
     row = gameweek+1
-    column = 3
+    if len(managers)%2 == 0:
+        column = 2
+    else:
+        column = 3
     cell_string=get_column_letter(column)+str(row)+":"+get_column_letter(column+len(managers)-1)+str(row)
     sheet.update(values=[scores],range_name=cell_string)
     return
@@ -195,12 +183,11 @@ def authorise_credentials():
     return client
 
 def process_standard(gameweek,client):
+    player_data = get_player_data()
     standard_scores = []
-    for manager in managers:
-        filename = manager + ".mhtml"
-        print("\t\tParsing " + manager + ".mhtml")
-        data = read_file(filename)
-        players, points, score = extract_data(data)
+    for manager in manager_ids:
+        print("\t\tFetching data for " + manager)
+        players, points, score = get_standard_data(manager_ids[manager],player_data)
         print("\t\tDone")
         standard_scores.append(score)
         print("\t\tWriting " + manager + "'s squad to spreadsheet")
@@ -234,6 +221,7 @@ def process_saf(gameweek,client):
 if __name__ == "__main__":
     gameweek = int(sys.argv[1])
 
+    print("Processing scores and squads")
     print("\tAuthorising credentials")
     client = authorise_credentials()
     print("\tDone")
@@ -243,3 +231,5 @@ if __name__ == "__main__":
     print("\tProcessing Set-And-Forget scores")
     process_saf(gameweek,client)
     print("\tDone")
+    print("Done")
+    print("Success!")
