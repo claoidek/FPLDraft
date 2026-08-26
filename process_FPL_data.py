@@ -141,24 +141,27 @@ def get_formation(team):
     return formation
 
 def get_standard_data(manager_id, player_data):
-    players, points = [], []
+    ids, positions, points = [], [], []
     r = requests.get('https://draft.premierleague.com/api/entry/'+manager_id+'/event/'+str(gameweek)).json()
     team = r["picks"].copy()
     for player in team:
         player_gameweek_history = get_gameweek_history(str(player["element"]))
-        players.append(player_data[['web_name']].loc[player_data['id_x'] == player["element"]].values[0][0])
+        ids.append(player["element"])
+        positions.append(player_data[['position_name']].loc[player_data['id_x'] == player["element"]].values[0][0])
         points.append(player_gameweek_history[['total_points']].loc[player_gameweek_history['round'] == gameweek].values[0][0].item())
     score = sum(points[:11])
-    return players, points, score
+    return ids, positions, points, score
 
-def write_squad_to_spreadsheet(client,gameweek,manager,players,points):
-    sheet = client.open(spreadsheet).worksheet("Squads")
+def write_squad_to_spreadsheet(client,gameweek,manager,ids,positions,points):
+    sheet = client.open(spreadsheet).worksheet("RawSquadData")
     manager_index = managers.index(manager)
     row = 2+manager_index*17
-    column = 2+(gameweek-1)*2
+    column = 2+(gameweek-1)*3
     cell_string=get_column_letter(column)+str(row)+":"+get_column_letter(column)+str(row+14)
-    sheet.update(values=list(map(list, zip(*[players]))),range_name=cell_string)
+    sheet.update(values=list(map(list, zip(*[ids]))),range_name=cell_string)
     cell_string=get_column_letter(column+1)+str(row)+":"+get_column_letter(column+1)+str(row+14)
+    sheet.update(values=list(map(list, zip(*[positions]))),range_name=cell_string)
+    cell_string=get_column_letter(column+2)+str(row)+":"+get_column_letter(column+2)+str(row+14)
     sheet.update(values=list(map(list, zip(*[points]))),range_name=cell_string)
     return
 
@@ -187,11 +190,11 @@ def process_standard(gameweek,client):
     standard_scores = []
     for manager in manager_ids:
         print("\t\tFetching data for " + manager)
-        players, points, score = get_standard_data(manager_ids[manager],player_data)
+        ids, positions, points, score = get_standard_data(manager_ids[manager],player_data)
         print("\t\tDone")
         standard_scores.append(score)
         print("\t\tWriting " + manager + "'s squad to spreadsheet")
-        write_squad_to_spreadsheet(client,gameweek,manager,players,points)
+        write_squad_to_spreadsheet(client,gameweek,manager,ids,positions,points)
         print("\t\tDone")
     print("\t\tWriting standard scores to spreadsheet")
     write_scores_to_spreadsheet(client,gameweek,standard_scores,"Scores")
