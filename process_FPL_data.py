@@ -7,20 +7,21 @@ from oauth2client.service_account import ServiceAccountCredentials
 from openpyxl.utils import get_column_letter
 
 managers = ["Brian","Caoimhín","Niamh","Seán"]
-manager_ids = {'Brian':'209940','Caoimhín':'2921','Niamh':'3006','Seán':'214689'}
+manager_ids = {"Brian":"209940","Caoimhín":"2921","Niamh":"3006","Seán":"214689"}
 league_id = '1140'
-draft_file="drafted_players_2627.csv"
+saf_file="set_and_forget_2627.csv"
+draft_file="draft2627.csv"
 client_file="client_key.json"
 spreadsheet="FPL Draft Stats 2026_27"
 
-def construct_draft_teams():
-    draft_teams = {}
+def construct_saf_teams():
+    saf_teams = {}
     for manager in managers:
-        add_draft_team(draft_teams,manager)
-    return draft_teams
+        add_saf_team(saf_teams,manager)
+    return saf_teams
 
-def add_draft_team(draft_teams,name):
-    draft_teams.update({name:{"start_gkp":{},
+def add_saf_team(saf_teams,name):
+    saf_teams.update({name:{"start_gkp":{},
                               "sub_gkp":{},
                               "def":{},
                               "mid":{},
@@ -31,14 +32,14 @@ def add_draft_team(draft_teams,name):
                               }})
 
 
-def add_player(draft_teams,manager,position,player,id_num,outfield_sub):
+def add_player(saf_teams,manager,position,player,id_num,outfield_sub):
     if(outfield_sub!=0):
-        draft_teams[manager]["subs"][outfield_sub]={"name":player,"position":position,"id":id_num,"score":0,"minutes":0}
+        saf_teams[manager]["subs"][outfield_sub]={"name":player,"position":position,"id":id_num,"score":0,"minutes":0}
     else:
-        draft_teams[manager][position][player]={}
-        draft_teams[manager][position][player]["id"]=id_num
-        draft_teams[manager][position][player]["score"]=0
-        draft_teams[manager][position][player]["minutes"]=0
+        saf_teams[manager][position][player]={}
+        saf_teams[manager][position][player]["id"]=id_num
+        saf_teams[manager][position][player]["score"]=0
+        saf_teams[manager][position][player]["minutes"]=0
 
 def read_player_csv(filename):
     with open(filename, newline='') as f:
@@ -73,13 +74,13 @@ def get_gameweek_history(player_id):
     player_df = pd.json_normalize(r['history'])
     return player_df
 
-def add_gameweek_data(draft_teams,gameweek):
+def add_gameweek_data(saf_teams,gameweek):
     for manager in managers:
         for position in ["start_gkp","sub_gkp","def","mid","fwd","subs"]:
-            for player in draft_teams[manager][position]:
-                player_gameweek_history = get_gameweek_history(draft_teams[manager][position][player]["id"])
-                draft_teams[manager][position][player]["score"] = player_gameweek_history.loc[player_gameweek_history['round'] == gameweek, 'total_points'].sum()
-                draft_teams[manager][position][player]["minutes"] = player_gameweek_history.loc[player_gameweek_history['round'] == gameweek, 'minutes'].sum()
+            for player in saf_teams[manager][position]:
+                player_gameweek_history = get_gameweek_history(saf_teams[manager][position][player]["id"])
+                saf_teams[manager][position][player]["score"] = player_gameweek_history.loc[player_gameweek_history['round'] == gameweek, 'total_points'].sum()
+                saf_teams[manager][position][player]["minutes"] = player_gameweek_history.loc[player_gameweek_history['round'] == gameweek, 'minutes'].sum()
 
 def get_score(team):
     starting_positions = ["def","mid","fwd","start_gkp"]
@@ -203,22 +204,36 @@ def process_standard(gameweek,client):
 
 def process_saf(gameweek,client):
     saf_scores = []
-    draft_teams = construct_draft_teams()
+    saf_teams = construct_saf_teams()
     print("\t\tReading Set-And-Forget teams from file")
-    player_data = read_player_csv(draft_file)
+    player_data = read_player_csv(saf_file)
     print("\t\tDone")
     print("\t\tAdding players to data structure")
     for player in player_data:
-        add_player(draft_teams,player[0],player[1],player[2],int(player[3]),int(player[4]))
+        add_player(saf_teams,player[0],player[1],player[2],int(player[3]),int(player[4]))
     print("\t\tDone")
     print("\t\tGetting players' data for game week " + str(gameweek))
-    add_gameweek_data(draft_teams,gameweek)
+    add_gameweek_data(saf_teams,gameweek)
     print("\t\tDone")
     for manager in managers:
-        saf_scores.append(get_score(draft_teams[manager]))
+        saf_scores.append(get_score(saf_teams[manager]))
     print("\t\tWriting scores to spreadsheet")
     write_scores_to_spreadsheet(client,gameweek,saf_scores,"SAFScores")
     print("\t\tDone")
+    return
+
+def process_draft_scores():
+    draft_scores = []
+    with open(draft_file,'r') as file:
+        players = [i.strip('\n') for i in file.readlines()]
+    for player in players:
+        r = requests.get('https://fantasy.premierleague.com/api/element-summary/'+player).json()
+        draft_scores.append(r["history"][0]["total_points"])
+    sheet = client.open(spreadsheet).worksheet("Draft")
+    row = 1
+    column = 2
+    cell_string=get_column_letter(column)+str(row)+":"+get_column_letter(column)+str(row+len(managers)*15)
+    sheet.update(values=list(map(list, zip(*[draft_scores]))),range_name=cell_string)
     return
 
 if __name__ == "__main__":
@@ -227,6 +242,9 @@ if __name__ == "__main__":
     print("Processing scores and squads")
     print("\tAuthorising credentials")
     client = authorise_credentials()
+    print("\tDone")
+    print("\tProcessing draft scores")
+    process_draft_scores()
     print("\tDone")
     print("\tProcessing standard scores and squads")
     process_standard(gameweek,client)
