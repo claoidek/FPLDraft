@@ -228,8 +228,11 @@ def process_draft_scores():
         players = [i.strip('\n') for i in file.readlines()]
     for player in players:
         r = requests.get('https://fantasy.premierleague.com/api/element-summary/'+player).json()
-        draft_scores.append(r["history"][0]["total_points"])
-    sheet = client.open(spreadsheet).worksheet("Draft")
+        total_score = 0
+        for entry in r["history"]:
+            total_score += int(entry["total_points"])
+        draft_scores.append(total_score)
+    sheet = client.open(spreadsheet).worksheet("RawDraft")
     row = 1
     column = 2
     cell_string=get_column_letter(column)+str(row)+":"+get_column_letter(column)+str(row+len(managers)*15)
