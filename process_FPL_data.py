@@ -14,6 +14,13 @@ draft_file="draft2627.csv"
 client_file="client_key.json"
 spreadsheet="FPL Draft Stats 2026_27"
 
+# The FPL API returns some player IDs incorrectly when a manager's squad for a
+# given week is queried. This dictionary is to allow this script to attempt to
+# substitute the correct player ID. Will break if both the correct and incorrect
+# players are chosen at any point in the season.
+incorrect_ids = {554:557, # van Oevelen -> Tzolis
+                 556:565} # Targett -> M.Sangaré
+
 def construct_saf_teams():
     saf_teams = {}
     for manager in managers:
@@ -146,9 +153,12 @@ def get_standard_data(manager_id, player_data):
     r = requests.get('https://draft.premierleague.com/api/entry/'+manager_id+'/event/'+str(gameweek)).json()
     team = r["picks"].copy()
     for player in team:
-        player_gameweek_history = get_gameweek_history(str(player["element"]))
-        ids.append(player["element"])
-        positions.append(player_data[['position_name']].loc[player_data['id_x'] == player["element"]].values[0][0])
+        idx = player["element"]
+        if idx in incorrect_ids:
+            idx = incorrect_ids[idx]
+        player_gameweek_history = get_gameweek_history(str(idx))
+        ids.append(idx)
+        positions.append(player_data[['position_name']].loc[player_data['id_x'] == idx].values[0][0])
         points.append(player_gameweek_history[['total_points']].loc[player_gameweek_history['round'] == gameweek].values[0][0].item())
     score = sum(points[:11])
     return ids, positions, points, score
